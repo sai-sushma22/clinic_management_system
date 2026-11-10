@@ -1,0 +1,148 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  RECEPTIONIST
+  NURSE
+  PHYSICIAN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CHECKED_IN
+  IN_CONSULTATION
+  COMPLETED
+  CANCELLED
+}
+
+enum EligibilityStatus {
+  POTENTIAL_MATCH
+  NOT_ELIGIBLE
+  NEEDS_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String @id @default(uuid()) @db.Uuid
+  name          String
+  email         String @unique
+  password      String
+  role          Role
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointments  Appointment[]
+  vitals        Vital[]
+  consultations Consultation[]
+}
+
+model Patient {
+  id          String @id @default(uuid()) @db.Uuid
+  patientCode String @unique
+  firstName   String
+  lastName    String
+  phone       String
+  email       String?
+  dateOfBirth DateTime?
+  gender      Gender?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  appointments Appointment[]
+  vitals       Vital[]
+  consultations Consultation[]
+  eligibility  PatientEligibility[]
+}
+
+model Appointment {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  physicianId String @db.Uuid
+  date        DateTime
+  reason      String?
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime @default(now())
+
+  patient   Patient @relation(fields: [patientId], references: [id])
+  physician User @relation(fields: [physicianId], references: [id])
+}
+
+model Vital {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  nurseId     String @db.Uuid
+  bloodPressure String?
+  temperature Float?
+  pulse       Int?
+  weight      Float?
+  height      Float?
+  oxygenLevel Float?
+  recordedAt  DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  nurse   User @relation(fields: [nurseId], references: [id])
+}
+
+model Consultation {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  physicianId String @db.Uuid
+  diagnosis   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  patient      Patient @relation(fields: [patientId], references: [id])
+  physician    User @relation(fields: [physicianId], references: [id])
+  prescriptions Prescription[]
+}
+
+model Prescription {
+  id             String @id @default(uuid()) @db.Uuid
+  consultationId String @db.Uuid
+  medicineName   String
+  dosage         String
+  frequency      String
+  duration       String?
+
+  consultation Consultation @relation(fields: [consultationId], references: [id])
+}
+
+model ClinicalStudy {
+  id          String @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  criteria    Json
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  eligibility PatientEligibility[]
+}
+
+model PatientEligibility {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @db.Uuid
+  studyId   String @db.Uuid
+  status    EligibilityStatus
+  reasons   Json
+  evaluatedAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  study   ClinicalStudy @relation(fields: [studyId], references: [id])
+
+  @@unique([patientId, studyId])
+}
